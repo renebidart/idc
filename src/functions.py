@@ -21,7 +21,7 @@ import torch.optim as optim
 from torch.optim import lr_scheduler
 import torchvision.transforms.functional as F
 
-import pretrainedmodels.utils as utils
+# import pretrainedmodels.utils as utils
 from sklearn.metrics import confusion_matrix
 
 
@@ -312,7 +312,7 @@ def eval_model_testing(model, criterion, optimizer, scheduler, dataloaders, data
 ######################################
 
 
-def get_preds(model, dataloader, dataset_size, criterion):
+def get_preds(model, dataloader, dataset_size):
     """Return label, prediction, prediction (rounded)"""
     model.train(False)  # Set model to evaluate mode
     model.eval()
@@ -540,6 +540,7 @@ def eval_fusion_model(model, model_list, dataloader, dataset_size, criterion):
             output = model_tmp(inputs)
             features.append(output)
         cat_features = torch.cat(features, 1)
+        print('cat_features.shape', cat_features.shape)
         ###########
         
         # forward
