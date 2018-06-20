@@ -120,8 +120,8 @@ def make_batch_gen_cifar(PATH, batch_size, num_workers, valid_name='valid', test
     return dataloaders, dataset_sizes
 
 
-def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders, dataset_sizes, device="cuda:0", verbose=False):
-    use_gpu = True
+def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders, dataset_sizes, device="cuda:0"):
+    print('Using device:',  device)
     model = model.to(device)
     since = time.time()
 

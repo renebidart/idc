@@ -1,4 +1,4 @@
-iimport torch
+import torch
 
 import torch.nn as nn
 import torch.optim as optim
@@ -14,6 +14,8 @@ import torchvision.models as models
 
 import sys
 import math
+
+# from https://github.com/bamos/densenet.pytorch
 
 class Bottleneck(nn.Module):
     def __init__(self, nChannels, growthRate):
