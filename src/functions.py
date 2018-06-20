@@ -90,9 +90,44 @@ def make_batch_gen_pretrained(PATH, batch_size, num_workers, valid_name='valid',
     dataset_sizes = {x: len(image_datasets[x]) for x in ['train', valid_name]}
     return dataloaders, dataset_sizes
 
+def make_batch_gen_cifar(PATH, batch_size, num_workers, valid_name='valid', test_name=None, return_locs=False):
+    data_transforms = {
+        'train': transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.RandomRotation(20),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ]),
+        valid_name: transforms.Compose([
+            # transforms.Resize((size, size)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        ]),
+    }
+    if test_name!=None:
+        data_transforms[test_name] = data_transforms[valid_name]
+
+    if return_locs: 
+        image_datasets = {x: ImageFolderBad(os.path.join(PATH, x),
+                                          data_transforms[x])
+                          for x in list(data_transforms.keys())}
+    else: 
+        image_datasets = {x: datasets.ImageFolder(os.path.join(PATH, x),
+                                                  data_transforms[x])
+                          for x in list(data_transforms.keys())}
+
+    dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size,
+                                                 shuffle=True, num_workers=num_workers)
+                  for x in list(data_transforms.keys())}
+
+    dataset_sizes = {x: len(image_datasets[x]) for x in list(data_transforms.keys())}
+    return dataloaders, dataset_sizes
 
 def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders, dataset_sizes, verbose=False):
     use_gpu = True
+    device = 'cuda'
+    model = model.to(device)
     since = time.time()
 
     best_model_wts = copy.deepcopy(model.state_dict())
@@ -113,18 +148,21 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders,
 
             running_loss = 0.0
             running_corrects = 0
+            total = 0
 
             # Iterate over data.
-            for data in tqdm(dataloaders[phase]):
+            for data in dataloaders[phase]:
                 # get the inputs
                 inputs, labels = data
 
-                # wrap them in Variable
-                if use_gpu:
-                    inputs = Variable(inputs.cuda())
-                    labels = Variable(labels.cuda())
-                else:
-                    inputs, labels = Variable(inputs), Variable(labels)
+                # # wrap them in Variable
+                # if use_gpu:
+                #     inputs = Variable(inputs.cuda())
+                #     labels = Variable(labels.cuda())
+                # else:
+                #     inputs, labels = Variable(inputs), Variable(labels)
+
+                inputs, labels = inputs.to(device), labels.to(device)
 
                 # zero the parameter gradients
                 optimizer.zero_grad()
@@ -134,6 +172,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders,
 
                 # for nets that have multiple outputs such as inception
                 if isinstance(outputs, tuple):
+                    print('weird tuple')
                     loss = sum((criterion(o,labels) for o in outputs)) # output is (outputs, aux_outputs)
                 else:
                     loss = criterion(outputs, labels)
@@ -142,44 +181,38 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders,
                 if phase == 'train':
                     if isinstance(outputs, tuple):
                         _, preds = torch.max(outputs[0].data, 1)
+                        print('weird tuple outputs')
                     else:
-                        _, preds = torch.max(outputs.data, 1)
+                        # _, preds = torch.max(outputs.data, 1)
+                         _, preds = outputs.max(1)
                     loss.backward()
                     optimizer.step()
                 else:
                     if isinstance(outputs, tuple):
+                        print('weird tuple')
                         _, preds = torch.max(outputs[0].data, 1)
                     else:
-                        _, preds = torch.max(outputs.data, 1)
+                        _, preds = outputs.max(1)
                 # statistics
-                running_loss += loss.data[0] * inputs.size(0)
-                running_corrects += torch.sum(preds == labels.data)
+                running_loss += loss.item()
+                running_corrects += preds.eq(labels).sum().item()
+                total += labels.size(0)
 
                 # stop those memory leaks
-                del loss, outputs 
+                del _, loss, outputs, preds, labels, inputs, 
 
-            epoch_loss = running_loss / dataset_sizes[phase]
-            epoch_acc = running_corrects / dataset_sizes[phase]
+            epoch_acc = 100.*running_corrects/total
 
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(
-                phase, epoch_loss, epoch_acc))
+                phase, running_loss, epoch_acc))
 
             # deep copy the model
             if phase == 'valid' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
             
-            if phase =='valid' and verbose:
-                # model_tmp = model.load_state_dict(best_model_wts)
-
-                valid_loss, valid_acc = eval_model(model, 
-                                                   dataloaders['valid'], dataset_sizes['valid'], criterion)
-                print('Validation perf w eval funct: ', valid_loss, valid_acc)
-
-                test_loss, test_acc = eval_model(model, 
-                                                   dataloaders['test'], dataset_sizes['test'], criterion)
-                print('Test perf w eval funct: ', test_loss, test_acc)
-
+            # delete everythin to make sure. The GPUs always cause issues
+            del running_loss, running_corrects, epoch_acc, total
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(
@@ -187,10 +220,6 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders,
     print('Best valid Acc: {:4f}'.format(best_acc))
     # load best model weights
     model.load_state_dict(best_model_wts)
-
-    valid_loss, valid_acc = eval_model(model, 
-                                       dataloaders['valid'], dataset_sizes['valid'], criterion)
-    print('Final Validation perf: ', valid_loss, valid_acc)
 
     return best_acc, model
 
@@ -219,7 +248,7 @@ def eval_model(model, dataloader, dataset_size, criterion):
             loss = criterion(outputs, labels)
         
         _, preds = torch.max(outputs.data, 1)
-        running_loss += loss.data[0] * inputs.size(0)
+        running_loss += loss.item() * inputs.size(0)
         running_corrects += torch.sum(preds == labels.data)
     
     del loss, outputs 
