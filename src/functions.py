@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 import torch
 import torch.nn as nn
+import torchvision
 from torch.autograd import Variable
 import torchvision.transforms as transforms
 import torch.utils.data
@@ -91,42 +92,36 @@ def make_batch_gen_pretrained(PATH, batch_size, num_workers, valid_name='valid',
     return dataloaders, dataset_sizes
 
 def make_batch_gen_cifar(PATH, batch_size, num_workers, valid_name='valid', test_name=None, return_locs=False):
-    data_transforms = {
-        'train': transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
-            transforms.RandomHorizontalFlip(),
-            transforms.RandomRotation(20),
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        ]),
-        valid_name: transforms.Compose([
-            # transforms.Resize((size, size)),
-            transforms.ToTensor(),
-            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        ]),
-    }
-    if test_name!=None:
-        data_transforms[test_name] = data_transforms[valid_name]
+    # from https://github.com/kuangliu/pytorch-cifar
+    transform_train = transforms.Compose([
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+         ])
 
-    if return_locs: 
-        image_datasets = {x: ImageFolderBad(os.path.join(PATH, x),
-                                          data_transforms[x])
-                          for x in list(data_transforms.keys())}
-    else: 
-        image_datasets = {x: datasets.ImageFolder(os.path.join(PATH, x),
-                                                  data_transforms[x])
-                          for x in list(data_transforms.keys())}
+    transform_test = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ])
 
-    dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=batch_size,
-                                                 shuffle=True, num_workers=num_workers)
-                  for x in list(data_transforms.keys())}
+    trainset = torchvision.datasets.CIFAR10(root=PATH, train=True, download=True, transform=transform_train)
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
 
-    dataset_sizes = {x: len(image_datasets[x]) for x in list(data_transforms.keys())}
+    testset = torchvision.datasets.CIFAR10(root=PATH, train=False, download=True, transform=transform_test)
+    testloader = torch.utils.data.DataLoader(testset, batch_size=batch_size, shuffle=False, num_workers=num_workers)
+    
+    dataloaders = {}
+    dataset_sizes = {}
+    dataloaders['train'] = trainloader
+    dataloaders['valid'] = testloader
+    dataset_sizes['train'] = len(trainset)
+    dataset_sizes['valid'] = len(testset)
     return dataloaders, dataset_sizes
 
-def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders, dataset_sizes, verbose=False):
+
+def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders, dataset_sizes, device="cuda:0", verbose=False):
     use_gpu = True
-    device = 'cuda'
     model = model.to(device)
     since = time.time()
 
@@ -140,7 +135,6 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders,
         # Each epoch has a training and validation phase
         for phase in ['train', 'valid']:
             if phase == 'train':
-                scheduler.step()
                 model.train(True)  # Set model to training mode
             else:
                 model.train(False)  # Set model to evaluate mode
@@ -151,23 +145,10 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders,
             total = 0
 
             # Iterate over data.
-            for data in dataloaders[phase]:
-                # get the inputs
-                inputs, labels = data
-
-                # # wrap them in Variable
-                # if use_gpu:
-                #     inputs = Variable(inputs.cuda())
-                #     labels = Variable(labels.cuda())
-                # else:
-                #     inputs, labels = Variable(inputs), Variable(labels)
-
+            for batch_idx, (inputs, labels) in enumerate(dataloaders[phase]):
                 inputs, labels = inputs.to(device), labels.to(device)
 
-                # zero the parameter gradients
                 optimizer.zero_grad()
-
-                # forward
                 outputs = model(inputs)
 
                 # for nets that have multiple outputs such as inception
@@ -213,6 +194,8 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders,
             
             # delete everythin to make sure. The GPUs always cause issues
             del running_loss, running_corrects, epoch_acc, total
+            scheduler.step()
+
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(
