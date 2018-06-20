@@ -76,14 +76,14 @@ class Trainer(object):
         save_path.mkdir(parents=True, exist_ok=True)
         epochs = int(epochs)
         num_workers = 4
-        batch_size = 100
+        batch_size = 50
         
         for i in range(start_num, n_models+start_num):
             dataloaders, dataset_sizes = make_batch_gen_cifar(str(PATH), batch_size, num_workers,
                                                                valid_name='valid')
             model_name = 'densenet_'+str(i)
 
-            model = DenseNet(growthRate=12, depth=121, reduction=0.5,
+            model = DenseNet(growthRate=24, depth=121, reduction=0.5,
                                     bottleneck=True, nClasses=10)
 
             criterion = nn.CrossEntropyLoss()
