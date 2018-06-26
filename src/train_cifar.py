@@ -95,7 +95,7 @@ class Trainer(object):
             torch.save(model.state_dict(), str(save_path / model_name))
 
 
-    def train_fusion(self, epochs1=3, epochs2=450, device="cuda:0"):
+    def train_fusion(self, epochs1=25, epochs2=100, device="cuda:0"):
         epochs1, epochs2 = int(epochs1), int(epochs2)
         num_workers = 4
         device="cuda:0"
@@ -137,7 +137,7 @@ class Trainer(object):
 
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.SGD(filter(lambda p: p.requires_grad,model.parameters()), lr=.1, momentum=0.9, weight_decay=5e-4)
-        scheduler = lr_scheduler.StepLR(optimizer, step_size=int(epochs1/3), gamma=0.1)
+        scheduler = lr_scheduler.StepLR(optimizer, step_size=int(epochs1), gamma=0.1)
 
         best_acc, model = train_model(model, criterion, optimizer, scheduler, epochs1, 
                                    dataloaders, dataset_sizes, device=device)
@@ -145,8 +145,9 @@ class Trainer(object):
 
         ########################   TRAIN ALL LAYERS
         model_name = 'Fusion2_2s2'
-        batch_size = 8
-        epochs = 3 #50
+        batch_size = 2
+        dataloaders, dataset_sizes = make_batch_gen_cifar(str(PATH), batch_size, num_workers,
+                                                            valid_name='valid')
 
         for p in model.parameters():
             p.requires_grad = True
@@ -155,7 +156,7 @@ class Trainer(object):
         optimizer = optim.SGD(filter(lambda p: p.requires_grad,model.parameters()), lr=.1, momentum=0.9, weight_decay=5e-4)
         scheduler = lr_scheduler.StepLR(optimizer, step_size=int(epochs2/2), gamma=0.1)
 
-        model = train_model(model, criterion, optimizer, scheduler, epochs1, 
+        best_acc, model = train_model(model, criterion, optimizer, scheduler, epochs1, 
                                    dataloaders, dataset_sizes, device=device)
 
         torch.save(model.state_dict(), str(save_path / model_name))
