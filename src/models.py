@@ -76,6 +76,32 @@ class Fusion2Hardcode(nn.Module):
         out = self.fc2(x5)
         return out
 
+
+class Fusion2(nn.Module):
+    ### only for 4 models
+    """Take list of models, fuse their output into 2 classes"""
+    def __init__(self, model_list, num_input, num_output):
+        super(Fusion2, self).__init__()
+        self.model1 = model_list[0]
+        self.model2 = model_list[1]
+        self.model3 = model_list[2]
+        self.model4 = model_list[3]
+        self.fc1 = nn.Linear(int(40), 16)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(16, int(10))
+
+    def forward(self, x):
+        x1 = self.model1(x)
+        x2 = self.model2(x)
+        x3 = self.model3(x)
+        x4 = self.model4(x)
+
+        x5 = torch.cat((x1, x2, x3, x4), 1)
+        x6 = self.fc1(x5)
+        x7 = self.relu(x6)
+        out = self.fc2(x7)
+        return out
+
 class Fusion3(nn.Module):
     """Throw away final classification layer before the concat is done.
     More parameters are in merged section of model: moving towards to a single model 
