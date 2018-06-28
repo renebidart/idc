@@ -68,7 +68,7 @@ class Trainer(object):
                                              epochs, dataloaders, dataset_sizes)
             torch.save(model.state_dict(), str(save_path / model_name))
 
-    def train_densenet_cifar(self, epochs=350, n_models=4, device="cuda:0", start_num=0):
+    def train_densenet_cifar(self, epochs=200, n_models=4, device="cuda:0", start_num=0):
         # Based off: https://github.com/kuangliu/pytorch-cifar
         start_num=int(start_num)
         PATH = Path('/home/rene/data')
@@ -160,6 +160,76 @@ class Trainer(object):
                                    dataloaders, dataset_sizes, device=device)
 
         torch.save(model.state_dict(), str(save_path / model_name))
+
+
+###########################. IDC.   ######################
+
+    def train_fusion_IDC_morefc(self, epochs1=2, epochs2=3, device="cuda:0"):
+        epochs1, epochs2 = int(epochs1), int(epochs2)
+        num_workers = 4
+        device="cuda:0"
+
+        PATH = Path('/home/rene/data/')
+        save_path = PATH /models
+        save_path.mkdir(parents=True, exist_ok=True)
+        model_name_list = ['ResNet50_2', 'ResNet50_7', 'ResNet50_1', 'ResNet50_0']
+        batch_size = 256
+
+        dataloaders, dataset_sizes = make_batch_gen_cifar(str(PATH), batch_size, num_workers,
+                                                            valid_name='valid')
+       
+        # get all the models
+        pretrained_model_list = []
+        for i, model_name in enumerate(model_name_list):
+            model = ResNet50()
+            model = model.to(device)
+            model.load_state_dict(torch.load(os.path.join(save_path, model_name)))
+            pretrained_model_list.append(model)
+
+        model = TriFusionMoreFC(pretrained_model_list, num_input=40, num_output=10)
+
+        ######################  TRAIN LAST FEW LAYERS
+        print('training last few layers')
+
+        model_name = 'Fusion2_2s1'
+        for p in model.parameters():
+            p.requires_grad = True
+
+        for p in model.model1.parameters():
+            p.requires_grad = False
+        for p in model.model2.parameters():
+            p.requires_grad = False
+        for p in model.model3.parameters():
+            p.requires_grad = False
+        for p in model.model4.parameters():
+            p.requires_grad = False
+
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.SGD(filter(lambda p: p.requires_grad,model.parameters()), lr=.05, momentum=0.9, weight_decay=5e-4)
+        scheduler = lr_scheduler.StepLR(optimizer, step_size=int(epochs1/3), gamma=0.1)
+
+        best_acc, model = train_model(model, criterion, optimizer, scheduler, epochs1, 
+                                   dataloaders, dataset_sizes, device=device)
+        torch.save(model.state_dict(), str(save_path / model_name + '_morefc'))
+
+        ########################   TRAIN ALL LAYERS
+        model_name = 'Fusion2_2s2'
+        batch_size = 6
+        dataloaders, dataset_sizes = make_batch_gen_cifar(str(PATH), batch_size, num_workers,
+                                                            valid_name='valid')
+
+        for p in model.parameters():
+            p.requires_grad = True
+
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.SGD(filter(lambda p: p.requires_grad,model.parameters()), lr=.005, momentum=0.9, weight_decay=5e-4)
+        scheduler = lr_scheduler.StepLR(optimizer, step_size=int(epochs2/3), gamma=0.1)
+
+        best_acc, model = train_model(model, criterion, optimizer, scheduler, epochs1, 
+                                   dataloaders, dataset_sizes, device=device)
+
+        torch.save(model.state_dict(), str(save_path / model_name + '_morefc'))
+
 
 
 def main():
