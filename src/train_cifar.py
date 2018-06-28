@@ -95,7 +95,7 @@ class Trainer(object):
             torch.save(model.state_dict(), str(save_path / model_name))
 
 
-    def train_fusion(self, epochs1=3, epochs2=3, device="cuda:0"):
+    def train_fusion(self, epochs1=30, epochs2=50, device="cuda:0"):
         epochs1, epochs2 = int(epochs1), int(epochs2)
         num_workers = 4
         device="cuda:0"
@@ -104,7 +104,7 @@ class Trainer(object):
         save_path = PATH / 'cifar-10-batches-py/models'
         save_path.mkdir(parents=True, exist_ok=True)
         model_name_list = ['ResNet50_2', 'ResNet50_7', 'ResNet50_1', 'ResNet50_0']
-        batch_size = 25
+        batch_size = 256
 
         dataloaders, dataset_sizes = make_batch_gen_cifar(str(PATH), batch_size, num_workers,
                                                             valid_name='valid')
@@ -136,8 +136,8 @@ class Trainer(object):
             p.requires_grad = False
 
         criterion = nn.CrossEntropyLoss()
-        optimizer = optim.SGD(filter(lambda p: p.requires_grad,model.parameters()), lr=.01, momentum=0.9, weight_decay=5e-4)
-        scheduler = lr_scheduler.StepLR(optimizer, step_size=int(epochs1/2), gamma=0.1)
+        optimizer = optim.SGD(filter(lambda p: p.requires_grad,model.parameters()), lr=.05, momentum=0.9, weight_decay=5e-4)
+        scheduler = lr_scheduler.StepLR(optimizer, step_size=int(epochs1/3), gamma=0.1)
 
         best_acc, model = train_model(model, criterion, optimizer, scheduler, epochs1, 
                                    dataloaders, dataset_sizes, device=device)
@@ -153,8 +153,8 @@ class Trainer(object):
             p.requires_grad = True
 
         criterion = nn.CrossEntropyLoss()
-        optimizer = optim.SGD(filter(lambda p: p.requires_grad,model.parameters()), lr=.01, momentum=0.9, weight_decay=5e-4)
-        scheduler = lr_scheduler.StepLR(optimizer, step_size=int(epochs2/2), gamma=0.1)
+        optimizer = optim.SGD(filter(lambda p: p.requires_grad,model.parameters()), lr=.005, momentum=0.9, weight_decay=5e-4)
+        scheduler = lr_scheduler.StepLR(optimizer, step_size=int(epochs2/3), gamma=0.1)
 
         best_acc, model = train_model(model, criterion, optimizer, scheduler, epochs1, 
                                    dataloaders, dataset_sizes, device=device)
