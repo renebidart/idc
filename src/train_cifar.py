@@ -95,7 +95,7 @@ class Trainer(object):
             torch.save(model.state_dict(), str(save_path / model_name))
 
 
-    def train_fusion(self, epochs1=30, epochs2=50, device="cuda:0"):
+    def train_fusion(self, epochs1=15, epochs2=25, device="cuda:0"):
         epochs1, epochs2 = int(epochs1), int(epochs2)
         num_workers = 4
         device="cuda:0"
