@@ -95,7 +95,7 @@ class Trainer(object):
             torch.save(model.state_dict(), str(save_path / model_name))
 
 
-    def train_fusion(self, epochs1=15, epochs2=25, device="cuda:0"):
+    def train_fusion(self, epochs1=60, epochs2=80, device="cuda:0"):
         epochs1, epochs2 = int(epochs1), int(epochs2)
         num_workers = 4
         device="cuda:0"
@@ -104,7 +104,7 @@ class Trainer(object):
         save_path = PATH / 'cifar-10-batches-py/models'
         save_path.mkdir(parents=True, exist_ok=True)
         model_name_list = ['ResNet50_2', 'ResNet50_7', 'ResNet50_1', 'ResNet50_0']
-        batch_size = 256
+        batch_size = 128
 
         dataloaders, dataset_sizes = make_batch_gen_cifar(str(PATH), batch_size, num_workers,
                                                             valid_name='valid')
@@ -122,7 +122,7 @@ class Trainer(object):
         ######################  TRAIN LAST FEW LAYERS
         print('training last few layers')
 
-        model_name = 'Fusion2_2s1'
+        model_name = 'Fusion2_2s1_r2'
         for p in model.parameters():
             p.requires_grad = True
 
@@ -136,7 +136,7 @@ class Trainer(object):
             p.requires_grad = False
 
         criterion = nn.CrossEntropyLoss()
-        optimizer = optim.SGD(filter(lambda p: p.requires_grad,model.parameters()), lr=.05, momentum=0.9, weight_decay=5e-4)
+        optimizer = optim.SGD(filter(lambda p: p.requires_grad,model.parameters()), lr=.005, momentum=0.9, weight_decay=5e-4)
         scheduler = lr_scheduler.StepLR(optimizer, step_size=int(epochs1/3), gamma=0.1)
 
         best_acc, model = train_model(model, criterion, optimizer, scheduler, epochs1, 
@@ -144,7 +144,7 @@ class Trainer(object):
         torch.save(model.state_dict(), str(save_path / model_name))
 
         ########################   TRAIN ALL LAYERS
-        model_name = 'Fusion2_2s2'
+        model_name = 'Fusion2_2s2_r2'
         batch_size = 6
         dataloaders, dataset_sizes = make_batch_gen_cifar(str(PATH), batch_size, num_workers,
                                                             valid_name='valid')
@@ -153,10 +153,10 @@ class Trainer(object):
             p.requires_grad = True
 
         criterion = nn.CrossEntropyLoss()
-        optimizer = optim.SGD(filter(lambda p: p.requires_grad,model.parameters()), lr=.005, momentum=0.9, weight_decay=5e-4)
+        optimizer = optim.SGD(filter(lambda p: p.requires_grad,model.parameters()), lr=.0005, momentum=0.9, weight_decay=5e-4)
         scheduler = lr_scheduler.StepLR(optimizer, step_size=int(epochs2/3), gamma=0.1)
 
-        best_acc, model = train_model(model, criterion, optimizer, scheduler, epochs1, 
+        best_acc, model = train_model(model, criterion, optimizer, scheduler, epochs2, 
                                    dataloaders, dataset_sizes, device=device)
 
         torch.save(model.state_dict(), str(save_path / model_name))
@@ -173,7 +173,7 @@ class Trainer(object):
         save_path = PATH /models
         save_path.mkdir(parents=True, exist_ok=True)
         model_name_list = ['ResNet50_2', 'ResNet50_7', 'ResNet50_1', 'ResNet50_0']
-        batch_size = 256
+        batch_size = 128
 
         dataloaders, dataset_sizes = make_batch_gen_cifar(str(PATH), batch_size, num_workers,
                                                             valid_name='valid')
