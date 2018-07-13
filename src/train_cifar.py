@@ -43,17 +43,16 @@ class Trainer(object):
 
     def __init__(self):
         pass
-
     
-    def train_resnet50_cifar(self, epochs=200, n_models=8):
+    def train_resnet50_cifar(self, epochs=200,  device="cuda:1", n_models=8):
         # Based off: https://github.com/kuangliu/pytorch-cifar
         PATH = Path('/home/rene/data')
-        save_path = PATH / 'models'
+        save_path = PATH / 'cifar-10-batches-py/models'
         save_path.mkdir(parents=True, exist_ok=True)
         epochs = int(epochs)
         num_workers = 4
-        batch_size = 180
-        
+        batch_size = 256
+
         for i in range(n_models):
             dataloaders, dataset_sizes = make_batch_gen_cifar(str(PATH), batch_size, num_workers,
                                                                valid_name='valid')
@@ -61,12 +60,13 @@ class Trainer(object):
             model = ResNet50()
 
             criterion = nn.CrossEntropyLoss()
-            optimizer = optim.SGD(model.parameters(), lr=.1, momentum=0.9, weight_decay=5e-4)
-            scheduler = lr_scheduler.StepLR(optimizer, step_size=int(epochs/2), gamma=0.1)
+            optimizer = optim.SGD(model.parameters(), lr=.05, momentum=0.9, weight_decay=5e-4)
+            scheduler = lr_scheduler.StepLR(optimizer, step_size=int(epochs/3), gamma=0.1)
 
             best_acc, model = train_model(model, criterion, optimizer, scheduler,
-                                             epochs, dataloaders, dataset_sizes)
+                                             epochs, dataloaders, dataset_sizes, device)
             torch.save(model.state_dict(), str(save_path / model_name))
+
 
     def train_densenet_cifar(self, epochs=200, n_models=4, device="cuda:0", start_num=0):
         # Based off: https://github.com/kuangliu/pytorch-cifar
@@ -82,7 +82,6 @@ class Trainer(object):
             dataloaders, dataset_sizes = make_batch_gen_cifar(str(PATH), batch_size, num_workers,
                                                                valid_name='valid')
             model_name = 'densenet_'+str(i)
-
             model = DenseNet(growthRate=24, depth=121, reduction=0.5,
                                     bottleneck=True, nClasses=10)
 
