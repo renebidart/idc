@@ -46,7 +46,7 @@ class Trainer(object):
     
     def train_resnet50_cifar(self, epochs=200,  device="cuda:1", n_models=8):
         # Based off: https://github.com/kuangliu/pytorch-cifar
-        PATH = Path('/home/rene/data')
+        PATH = Path('/media/rene/data/')
         save_path = PATH / 'cifar-10-batches-py/models'
         save_path.mkdir(parents=True, exist_ok=True)
         epochs = int(epochs)
@@ -71,7 +71,7 @@ class Trainer(object):
     def train_densenet_cifar(self, epochs=200, n_models=4, device="cuda:0", start_num=0):
         # Based off: https://github.com/kuangliu/pytorch-cifar
         start_num=int(start_num)
-        PATH = Path('/home/rene/data')
+        PATH = Path('/media/rene/data')
         save_path = PATH / 'models'
         save_path.mkdir(parents=True, exist_ok=True)
         epochs = int(epochs)
@@ -94,20 +94,19 @@ class Trainer(object):
             torch.save(model.state_dict(), str(save_path / model_name))
 
 
-    def train_fusion(self, epochs1=60, epochs2=80, device="cuda:0"):
+    def train_fusion(self, epochs1=100, epochs2=200, device="cuda:1"):
         epochs1, epochs2 = int(epochs1), int(epochs2)
         num_workers = 4
-        device="cuda:0"
 
-        PATH = Path('/home/rene/data/')
+        PATH = Path('/media/rene/data/')
         save_path = PATH / 'cifar-10-batches-py/models'
         save_path.mkdir(parents=True, exist_ok=True)
-        model_name_list = ['ResNet50_2', 'ResNet50_7', 'ResNet50_1', 'ResNet50_0']
+        model_name_list = ['ResNet50_5', 'ResNet50_0', 'ResNet50_7', 'ResNet50_6']
         batch_size = 128
 
         dataloaders, dataset_sizes = make_batch_gen_cifar(str(PATH), batch_size, num_workers,
                                                             valid_name='valid')
-       
+
         # get all the models
         pretrained_model_list = []
         for i, model_name in enumerate(model_name_list):

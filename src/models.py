@@ -391,6 +391,5 @@ def test():
 
 
 # ???? 
-# where is densenet?
 # https://github.com/kuangliu/pytorch-cifar
 # https://github.com/bamos/densenet.pytorch
