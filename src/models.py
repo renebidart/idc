@@ -22,6 +22,74 @@ import torch.optim as optim
 from torch.optim import lr_scheduler
 
 
+class Fusion2(nn.Module):
+    ### only for 4 models
+    """Take list of models, fuse their output into 2 classes"""
+    def __init__(self, model_list, num_input, num_output):
+        super(Fusion2, self).__init__()
+        self.model1 = model_list[0]
+        self.model2 = model_list[1]
+        self.model3 = model_list[2]
+        self.model4 = model_list[3]
+        self.fc1 = nn.Linear(int(40), 16)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(16, int(10))
+
+    def forward(self, x):
+        x1 = self.model1(x)
+        x2 = self.model2(x)
+        x3 = self.model3(x)
+        x4 = self.model4(x)
+
+        x5 = torch.cat((x1, x2, x3, x4), 1)
+        x6 = self.fc1(x5)
+        x7 = self.relu(x6)
+        out = self.fc2(x7)
+        return out
+
+class Fusion2More(nn.Module):
+    ### only for 4 models
+    """Take list of models, fuse their output into 2 classes"""
+    def __init__(self, model_list, num_input, num_output):
+        super(Fusion2More, self).__init__()
+        self.model1 = model_list[0]
+        self.model2 = model_list[1]
+        self.model3 = model_list[2]
+        self.model4 = model_list[3]
+        self.fc1 = nn.Linear(int(8192), 512)
+        self.fc1_drop = nn.Dropout(p=0.5)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(512, int(10))
+
+    def forward(self, x):
+        x1 = self.model1(x)
+        x2 = self.model2(x)
+        x3 = self.model3(x)
+        x4 = self.model4(x)
+
+        x5 = torch.cat((x1, x2, x3, x4), 1)
+        x6 = self.relu(self.fc1_drop(self.fc1(x5)))
+        out = self.fc2(x6)
+        return out
+
+class ResNet50Bottom(nn.Module):
+
+    def __init__(self, original_model):
+        super(ResNet50Bottom, self).__init__()
+        self.features = nn.Sequential(*list(original_model.children())[:-1])
+        self.pool = nn.AdaptiveAvgPool2d(1)
+        
+    def forward(self, x):
+        x = self.features(x)
+        x = self.pool(x)
+        x = torch.squeeze(x)
+        return x
+
+
+
+##### USELESS STUFF?
+
+
 class Fusion1(nn.Module):
     """Take list of models, fuse their output into 2 classes"""
     def __init__(self, model_list):
@@ -77,30 +145,7 @@ class Fusion2Hardcode(nn.Module):
         return out
 
 
-class Fusion2(nn.Module):
-    ### only for 4 models
-    """Take list of models, fuse their output into 2 classes"""
-    def __init__(self, model_list, num_input, num_output):
-        super(Fusion2, self).__init__()
-        self.model1 = model_list[0]
-        self.model2 = model_list[1]
-        self.model3 = model_list[2]
-        self.model4 = model_list[3]
-        self.fc1 = nn.Linear(int(40), 16)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(16, int(10))
 
-    def forward(self, x):
-        x1 = self.model1(x)
-        x2 = self.model2(x)
-        x3 = self.model3(x)
-        x4 = self.model4(x)
-
-        x5 = torch.cat((x1, x2, x3, x4), 1)
-        x6 = self.fc1(x5)
-        x7 = self.relu(x6)
-        out = self.fc2(x7)
-        return out
 
 
  #########.   OLD ONE WAS $ MODEL. HARDCODE TO #3??? POP The last fc layers howerever they're labelled.
@@ -126,39 +171,6 @@ class TriFusionMoreFC(nn.Module):
         x6 = self.fc1(x5)
         x7 = self.relu(x6)
         out = self.fc2(x7)
-        return out
-
-
-
-
-
-class Fusion3(nn.Module):
-    """Throw away final classification layer before the concat is done.
-    More parameters are in merged section of model: moving towards to a single model 
-    Pop last (classification) layer of models, concat output->256 node fc->output(2 class)
-    """
-    def __init__(self, model_list):
-        super(Fusion1, self).__init__()
-        new_models = []
-        model_ft.fc.in_features = 0
-        for model in new_models:
-            model_ft.fc.in_features += model.fc.in_features
-            modules = list(model.children())[:-1]      # delete the last fc layer.
-            model = nn.Sequential(*modules)
-            new_models.append(model)        
-        
-        self.model_list = new_models
-        self.num_input = int(len(self.model_list)*2)
-        self.fc1 = nn.Linear(num_input, 256)
-        self.fc2 = nn.Linear(256, 2)
-        
-    def forward(self, x):
-        outputs = []
-        for model in model_list:
-            outputs.append(model(x))
-        x1 = torch.cat(outputs, 1)
-        x2 = F.relu(self.fc1(x))
-        out = self.fc2(x2)
         return out
 
 
