@@ -73,7 +73,6 @@ class Fusion2More(nn.Module):
         return out
 
 class ResNet50Bottom(nn.Module):
-
     def __init__(self, original_model):
         super(ResNet50Bottom, self).__init__()
         self.features = nn.Sequential(*list(original_model.children())[:-1])

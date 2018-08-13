@@ -37,6 +37,11 @@ sys.path.append(src_dir)
 from functions import*
 from models import*
 
+sys.path.append('/media/rene/code/wide-resnet.pytorch')
+from networks import Wide_ResNet
+
+
+
 class Trainer(object):
     """ Just use a class to use python fire rather than argparse because its faster.
     """
@@ -222,6 +227,78 @@ class Trainer(object):
 
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.SGD(filter(lambda p: p.requires_grad,model.parameters()), lr=.001, momentum=0.9, weight_decay=5e-4)
+        scheduler = lr_scheduler.StepLR(optimizer, step_size=int(epochs2/3), gamma=0.1)
+
+        best_acc, model = train_model(model, criterion, optimizer, scheduler, epochs2, 
+                                   dataloaders, dataset_sizes, device=device)
+
+        torch.save(model.state_dict(), str(save_path / model_name))
+
+
+
+    def train_fusionWRN4(self, epochs1=120, epochs2=80, device="cuda:1"):
+        epochs1, epochs2 = int(epochs1), int(epochs2)
+        num_workers = 4
+
+        PATH = Path('/media/rene/data/')
+        save_path = PATH / 'cifar-10-batches-py/wide-RN-models'
+        model_name_list = ['wideRN2.t7', 'wideRN5.t7', 'wideRN0.t7', 'wideRN1.t7']
+        batch_size = 12
+
+        dataloaders, dataset_sizes = make_batch_gen_cifar(str(PATH), batch_size, num_workers,
+                                                            valid_name='valid')
+
+        # get all the models
+        pretrained_model_list = []
+        for i, model_name in enumerate(model_name_list):
+            model = Wide_ResNet(28, 20, 0, 10)
+            model = model.to(device)
+            
+            # load the saved weights
+            model_path = os.path.join(save_path, model_name)
+            model.load_state_dict(torch.load(model_path)['net'].state_dict())
+            pretrained_model_list.append(model)
+
+        model = Fusion2(pretrained_model_list, num_input=40, num_output=10)
+
+        ######################  TRAIN LAST FEW LAYERS
+        print('training last few layers')
+
+        model_name = 'Fusion2_WRN_1'
+        for p in model.parameters():
+            p.requires_grad = True
+
+        for p in model.model1.parameters():
+            p.requires_grad = False
+        for p in model.model2.parameters():
+            p.requires_grad = False
+        for p in model.model3.parameters():
+            p.requires_grad = False
+        for p in model.model4.parameters():
+            p.requires_grad = False
+
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.SGD(filter(lambda p: p.requires_grad,model.parameters()), lr=.005, momentum=0.9, weight_decay=5e-4)
+        scheduler = lr_scheduler.StepLR(optimizer, step_size=int(epochs1/3), gamma=0.1)
+
+        best_acc, model = train_model(model, criterion, optimizer, scheduler, epochs1, 
+                                   dataloaders, dataset_sizes, device=device)
+        torch.save(model.state_dict(), str(save_path / model_name))
+
+
+
+        ########################   TRAIN ALL LAYERS
+
+        model_name = 'Fusion2_WRN_2'
+        batch_size = 5
+        dataloaders, dataset_sizes = make_batch_gen_cifar(str(PATH), batch_size, num_workers,
+                                                            valid_name='valid')
+
+        for p in model.parameters():
+            p.requires_grad = True
+
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.SGD(filter(lambda p: p.requires_grad,model.parameters()), lr=.0005, momentum=0.9, weight_decay=5e-4)
         scheduler = lr_scheduler.StepLR(optimizer, step_size=int(epochs2/3), gamma=0.1)
 
         best_acc, model = train_model(model, criterion, optimizer, scheduler, epochs2, 
