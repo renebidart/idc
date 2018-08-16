@@ -23,7 +23,7 @@ from torch.optim import lr_scheduler
 import torchvision.transforms.functional as F
 
 # import pretrainedmodels.utils as utils
-from sklearn.metrics import confusion_matrix
+# from sklearn.metrics import confusion_matrix
 
 
 def make_batch_gen(PATH, batch_size, num_workers, valid_name='valid', test_name=None, size=224, return_locs=False):
@@ -102,7 +102,10 @@ def make_batch_gen_cifar(PATH, batch_size, num_workers, valid_name='valid', test
 
     transform_test = transforms.Compose([
         transforms.ToTensor(),
+        # UN COMMENT THIS %%@%%@@ ???????????????????????/
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        # transforms.Normalize(mean=[x/255.0 for x in [125.3, 123.0, 113.9]],
+        #                              std=[x/255.0 for x in [63.0, 62.1, 66.7]])
     ])
 
     trainset = torchvision.datasets.CIFAR10(root=PATH, train=True, download=True, transform=transform_train)
