@@ -91,22 +91,26 @@ def make_batch_gen_pretrained(PATH, batch_size, num_workers, valid_name='valid',
     dataset_sizes = {x: len(image_datasets[x]) for x in ['train', valid_name]}
     return dataloaders, dataset_sizes
 
-def make_batch_gen_cifar(PATH, batch_size, num_workers, valid_name='valid', test_name=None, return_locs=False):
+def make_batch_gen_cifar(PATH, batch_size, num_workers, valid_name='valid', test_name=None, return_locs=False, transformation=None):
     # from https://github.com/kuangliu/pytorch-cifar
-    transform_train = transforms.Compose([
-        transforms.RandomCrop(32, padding=4),
-        transforms.RandomHorizontalFlip(),
-        transforms.ToTensor(),
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-         ])
+    if transformation:
+        transform_train = transformation
+        transform_test = transformation
+    else:
+        transform_train = transforms.Compose([
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+             ])
 
-    transform_test = transforms.Compose([
-        transforms.ToTensor(),
-        # UN COMMENT THIS %%@%%@@ ???????????????????????/
-        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-        # transforms.Normalize(mean=[x/255.0 for x in [125.3, 123.0, 113.9]],
-        #                              std=[x/255.0 for x in [63.0, 62.1, 66.7]])
-    ])
+        transform_test = transforms.Compose([
+            transforms.ToTensor(),
+            # UN COMMENT THIS %%@%%@@ ???????????????????????/
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+            # transforms.Normalize(mean=[x/255.0 for x in [125.3, 123.0, 113.9]],
+            #                              std=[x/255.0 for x in [63.0, 62.1, 66.7]])
+        ])
 
     trainset = torchvision.datasets.CIFAR10(root=PATH, train=True, download=True, transform=transform_train)
     trainloader = torch.utils.data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=num_workers)
@@ -123,91 +127,95 @@ def make_batch_gen_cifar(PATH, batch_size, num_workers, valid_name='valid', test
     return dataloaders, dataset_sizes
 
 
-def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders, dataset_sizes, device="cuda:0"):
-    print('Using device:',  device)
-    model = model.to(device)
-    since = time.time()
+# def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders, dataset_sizes, device="cuda:0", multi_gpu=False):
+#     print('Using device:',  device)
 
-    best_model_wts = copy.deepcopy(model.state_dict())
-    best_acc = 0.0
+#     if multi_gpu:
+#         model = nn.DataParallel(model)
+#     model = model.to(device)
 
-    for epoch in range(num_epochs):
-        print('Epoch {}/{}'.format(epoch, num_epochs - 1))
-        print('-' * 10)
+#     since = time.time()
 
-        # Each epoch has a training and validation phase
-        for phase in ['train', 'valid']:
-            if phase == 'train':
-                model.train(True)  # Set model to training mode
-            else:
-                model.train(False)  # Set model to evaluate mode
-                model.eval()
+#     best_model_wts = copy.deepcopy(model.state_dict())
+#     best_acc = 0.0
 
-            running_loss = 0.0
-            running_corrects = 0
-            total = 0
+#     for epoch in range(num_epochs):
+#         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
+#         print('-' * 10)
 
-            # Iterate over data.
-            for batch_idx, (inputs, labels) in enumerate(dataloaders[phase]):
-                inputs, labels = inputs.to(device), labels.to(device)
+#         # Each epoch has a training and validation phase
+#         for phase in ['train', 'valid']:
+#             if phase == 'train':
+#                 model.train(True)  # Set model to training mode
+#             else:
+#                 model.train(False)  # Set model to evaluate mode
+#                 model.eval()
 
-                optimizer.zero_grad()
-                outputs = model(inputs)
+#             running_loss = 0.0
+#             running_corrects = 0
+#             total = 0
 
-                # for nets that have multiple outputs such as inception
-                if isinstance(outputs, tuple):
-                    print('weird tuple')
-                    loss = sum((criterion(o,labels) for o in outputs)) # output is (outputs, aux_outputs)
-                else:
-                    loss = criterion(outputs, labels)
+#             # Iterate over data.
+#             for batch_idx, (inputs, labels) in enumerate(dataloaders[phase]):
+#                 inputs, labels = inputs.to(device), labels.to(device)
 
-                # backward + optimize only if in training phase
-                if phase == 'train':
-                    if isinstance(outputs, tuple):
-                        _, preds = torch.max(outputs[0].data, 1)
-                        print('weird tuple outputs')
-                    else:
-                        # _, preds = torch.max(outputs.data, 1)
-                         _, preds = outputs.max(1)
-                    loss.backward()
-                    optimizer.step()
-                else:
-                    if isinstance(outputs, tuple):
-                        print('weird tuple')
-                        _, preds = torch.max(outputs[0].data, 1)
-                    else:
-                        _, preds = outputs.max(1)
-                # statistics
-                running_loss += loss.item()
-                running_corrects += preds.eq(labels).sum().item()
-                total += labels.size(0)
+#                 optimizer.zero_grad()
+#                 outputs = model(inputs)
 
-                # stop those memory leaks
-                del _, loss, outputs, preds, labels, inputs
+#                 # for nets that have multiple outputs such as inception
+#                 if isinstance(outputs, tuple):
+#                     print('weird tuple')
+#                     loss = sum((criterion(o,labels) for o in outputs)) # output is (outputs, aux_outputs)
+#                 else:
+#                     loss = criterion(outputs, labels)
 
-            epoch_acc = 100.*running_corrects/total
+#                 # backward + optimize only if in training phase
+#                 if phase == 'train':
+#                     if isinstance(outputs, tuple):
+#                         _, preds = torch.max(outputs[0].data, 1)
+#                         print('weird tuple outputs')
+#                     else:
+#                         # _, preds = torch.max(outputs.data, 1)
+#                          _, preds = outputs.max(1)
+#                     loss.backward()
+#                     optimizer.step()
+#                 else:
+#                     if isinstance(outputs, tuple):
+#                         print('weird tuple')
+#                         _, preds = torch.max(outputs[0].data, 1)
+#                     else:
+#                         _, preds = outputs.max(1)
+#                 # statistics
+#                 running_loss += loss.item()
+#                 running_corrects += preds.eq(labels).sum().item()
+#                 total += labels.size(0)
 
-            print('{} Loss: {:.4f} Acc: {:.4f}'.format(
-                phase, running_loss, epoch_acc))
+#                 # stop those memory leaks
+#                 del _, loss, outputs, preds, labels, inputs
 
-            # deep copy the model
-            if phase == 'valid' and epoch_acc > best_acc:
-                best_acc = epoch_acc
-                best_model_wts = copy.deepcopy(model.state_dict())
+#             epoch_acc = 100.*running_corrects/total
+
+#             print('{} Loss: {:.4f} Acc: {:.4f}'.format(
+#                 phase, running_loss, epoch_acc))
+
+#             # deep copy the model
+#             if phase == 'valid' and epoch_acc > best_acc:
+#                 best_acc = epoch_acc
+#                 best_model_wts = copy.deepcopy(model.state_dict())
             
-            # delete everythin to make sure. The GPUs always cause issues
-            del running_loss, running_corrects, epoch_acc, total
-            scheduler.step()
+#             # delete everythin to make sure. The GPUs always cause issues
+#             del running_loss, running_corrects, epoch_acc, total
+#             scheduler.step()
 
 
-    time_elapsed = time.time() - since
-    print('Training complete in {:.0f}m {:.0f}s'.format(
-        time_elapsed // 60, time_elapsed % 60))
-    print('Best valid Acc: {:4f}'.format(best_acc))
-    # load best model weights
-    model.load_state_dict(best_model_wts)
+#     time_elapsed = time.time() - since
+#     print('Training complete in {:.0f}m {:.0f}s'.format(
+#         time_elapsed // 60, time_elapsed % 60))
+#     print('Best valid Acc: {:4f}'.format(best_acc))
+#     # load best model weights
+#     model.load_state_dict(best_model_wts)
 
-    return best_acc, model
+#     return best_acc, model
 
 
 def eval_model(model, dataloader, dataset_size, criterion, device="cuda:0"):
@@ -477,9 +485,17 @@ class WeightedSum(nn.Module):
         out = self.fc1(x)
         return out
 
-def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders, dataset_sizes, device="cuda:0"):
+def train_model(model, criterion, optimizer, scheduler, num_epochs, dataloaders, dataset_sizes, device="cuda:1", multi_gpu=False):
+    device = torch.device(device)
     print('Using device:',  device)
+
     model = model.to(device)
+
+    if multi_gpu:
+        print("Using DataParallel with ", torch.cuda.device_count(), "GPUs")
+        # model = nn.DataParallel(model)
+        model = nn.DataParallel(model, device_ids=[0, 1]).to(device)
+
     since = time.time()
 
     best_model_wts = copy.deepcopy(model.state_dict())

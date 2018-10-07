@@ -47,16 +47,69 @@ class Fusion2(nn.Module):
         out = self.fc2(x7)
         return out
 
-class Fusion2More(nn.Module):
-    ### only for 4 models
+class Fusion3(nn.Module):
+    ### only for 3 models
     """Take list of models, fuse their output into 2 classes"""
     def __init__(self, model_list, num_input, num_output):
-        super(Fusion2More, self).__init__()
+        super(Fusion3, self).__init__()
+        self.model1 = model_list[0]
+        self.model2 = model_list[1]
+        self.model3 = model_list[2]
+        self.fc1 = nn.Linear(int(30), 24)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(24, int(10))
+
+    def forward(self, x):
+        x1 = self.model1(x)
+        x2 = self.model2(x)
+        x3 = self.model3(x)
+
+        x5 = torch.cat((x1, x2, x3), 1)
+        x6 = self.fc1(x5)
+        x7 = self.relu(x6)
+        out = self.fc2(x7)
+        return out
+
+
+class Fusion6(nn.Module):
+    """Take list of models, fuse their output into 2 classes"""
+    def __init__(self, model_list, num_input, num_output):
+        super(Fusion6, self).__init__()
         self.model1 = model_list[0]
         self.model2 = model_list[1]
         self.model3 = model_list[2]
         self.model4 = model_list[3]
-        self.fc1 = nn.Linear(int(8192), 512)
+        self.model5 = model_list[4]
+        self.model6 = model_list[5]
+
+        self.fc1 = nn.Linear(int(60), 16)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(16, int(10))
+
+    def forward(self, x):
+        x1 = self.model1(x)
+        x2 = self.model2(x)
+        x3 = self.model3(x)
+        x4 = self.model4(x)
+        x5 = self.model5(x)
+        x6 = self.model6(x)
+
+        x8 = torch.cat((x1, x2, x3, x4, x5, x6), 1)
+        x8 = self.fc1(x8)
+        x8 = self.relu(x8)
+        out = self.fc2(x8)
+        return out
+
+class Fusion2More(nn.Module):
+    ### only for 4 models
+    """Take list of models, fuse their output into 2 classes"""
+    def __init__(self, model_list):
+        super(Fusion2More, self).__init__()
+        self.model1 = ResNet50Bottom(model_list[0])
+        self.model2 = ResNet50Bottom(model_list[1])
+        self.model3 = ResNet50Bottom(model_list[2])
+        self.model4 = ResNet50Bottom(model_list[3])
+        self.fc1 = nn.Linear(int(5120), 512)
         self.fc1_drop = nn.Dropout(p=0.5)
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(512, int(10))
